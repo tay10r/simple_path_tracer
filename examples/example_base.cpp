@@ -1,5 +1,7 @@
 #include "example_base.h"
 
+#include <window_blit/window_blit.hpp>
+
 #include <GLFW/glfw3.h>
 
 #include <cstdlib>
@@ -8,39 +10,34 @@
 #include <Windows.h>
 #endif
 
+namespace {
+
+class App final : public window_blit::AppBase
+{
+public:
+  App(GLFWwindow* window)
+    : window_blit::AppBase(window)
+    , m_example(Example::Create())
+  {}
+
+  void render(float* rgb, int w, int h) override
+  {
+    m_example->Render(rgb, glm::ivec2(0, 0), glm::ivec2(w, h), glm::ivec2(w, h));
+  }
+
+private:
+  std::unique_ptr<Example> m_example;
+};
+
+} // namespace
+
 #ifdef _WIN32
 INT
 WinMain(HINSTANCE, HINSTANCE, PSTR, int)
 #else
-int main()
+int
+main()
 #endif
 {
-	if (glfwInit() != GLFW_TRUE)
-		return EXIT_FAILURE;
-
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-
-	GLFWwindow* window = glfwCreateWindow(640, 480, "", nullptr, nullptr);
-	if (!window) {
-		glfwTerminate();
-		return EXIT_FAILURE;
-	}
-
-	glfwMakeContextCurrent(window);
-
-	glfwSwapInterval(1);
-
-	std::unique_ptr<Example> example = Example::Create();
-
-	while (!glfwWindowShouldClose(window)) {
-
-		glfwPollEvents();
-	}
-
-	glfwDestroyWindow(window);
-
-	glfwTerminate();
-
-	return EXIT_SUCCESS;
+  return window_blit::run_glfw_window(window_blit::AppFactory<App>());
 }

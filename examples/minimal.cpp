@@ -1,54 +1,54 @@
 #include "example_base.h"
 
-#include <rt.h>
+#include <rt.hpp>
 
 namespace {
 
 class MinimalExample final : public Example
 {
 public:
-	MinimalExample()
-	{
-		auto vertexBuffer = m_context->GenBuffer();
+  MinimalExample()
+  {
+    auto vertexBuffer = m_context->GenBuffer();
 
-		vertexBuffer->Resize(2);
+    // clang-format off
+    const float vertices[]{
+      // sphere 0 (center+radius)
+      -1.0f,  0.0f,  0.0f, 1.0f,
+      // sphere 1
+       1.0f,  0.0f, -1.0f, 1.0f
+    };
+    // clang-format on
 
-		vertexBuffer->Write();
+    vertexBuffer->Resize(sizeof(vertices));
 
-		m_context->Bind(RT::BufferTarget::Attrib, vertexBuffer);
+    vertexBuffer->Write(0, vertices, sizeof(vertices));
 
-		auto sphereGeom = m_context->Draw(RT::PrimitiveKind::Spheres, 0, 2);
+    m_context->Bind(RT::BufferTarget::Attrib, vertexBuffer);
 
-		m_context->Bind(RT::BufferTarget::Attrib, nullptr);
+    m_sphereGeometry = m_context->Draw(RT::PrimitiveKind::Spheres, 0, 2);
 
-		//m_context->Attach(sphereGeom);
-	}
+    m_context->Bind(RT::BufferTarget::Attrib, nullptr);
+  }
 
-	void Render(float* rgb, glm::ivec2 min, glm::ivec2 max, glm::ivec2 frameSize) override {
+  void Render(float* rgb, glm::ivec2 min, glm::ivec2 max, glm::ivec2 frameSize) override
+  {
+    m_context->Attach(m_sphereGeometry);
 
-          const glm::ivec2 area = max - min;
+    m_context->SetViewport(0, 0, frameSize.x, frameSize.y);
 
-          const int pixelCount = area.x * area.y;
+    m_context->Render(min.x, min.y, max.x, max.y, rgb);
 
-		  for (int i = 0; i < pixelCount; i++) {
-
-            const int x = min.x + (i % area.x);
-            const int y = min.y + (i / area.x);
-
-			const float u = (x + 0.5f) / area.x;
-			const float v = (y + 0.5f) / area.y;
-
-			rgb[(i * 3) + 0] = u;
-			rgb[(i * 3) + 1] = v;
-			rgb[(i * 3) + 2] = 1;
-		  }
-	}
+    m_context->ClearScene();
+  }
 
 private:
   std::unique_ptr<RT::Context> m_context{ RT::Context::Create() };
+
+  std::shared_ptr<RT::Geometry> m_sphereGeometry;
 };
 
-}
+} // namespace
 
 std::unique_ptr<Example>
 Example::Create()
