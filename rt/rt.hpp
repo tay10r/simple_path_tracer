@@ -130,6 +130,11 @@ public:
   /// Removes all attached geometry and lights from the scene.
   /// </summary>
   virtual void ClearScene() = 0;
+
+  /// <summary>
+  /// Sets the perspective transformation applies to camera rays.
+  /// </summary>
+  virtual void SetPerspective(float fovy, float aspect, float near, float far) = 0;
 };
 
 } // namespace RT

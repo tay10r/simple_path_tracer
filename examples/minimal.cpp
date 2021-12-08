@@ -16,7 +16,9 @@ public:
       // sphere 0 (center+radius)
       -1.0f,  0.0f,  0.0f, 1.0f,
       // sphere 1
-       1.0f,  0.0f, -1.0f, 1.0f
+       1.0f,  0.0f, -1.0f, 1.0f,
+      // sphere 2
+       0.0f,  -101.0f, 0.0f, 100.0f
     };
     // clang-format on
 
@@ -26,7 +28,7 @@ public:
 
     m_context->Bind(RT::BufferTarget::Attrib, vertexBuffer);
 
-    m_sphereGeometry = m_context->Draw(RT::PrimitiveKind::Spheres, 0, 2);
+    m_sphereGeometry = m_context->Draw(RT::PrimitiveKind::Spheres, 0, 3);
 
     m_context->Bind(RT::BufferTarget::Attrib, nullptr);
   }

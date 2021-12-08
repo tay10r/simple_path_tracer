@@ -85,13 +85,6 @@ public:
   virtual void Accept(GeometryVisitor& visitor) const = 0;
 };
 
-struct Sphere final
-{
-  glm::vec3 center;
-
-  float radius;
-};
-
 class SphereGeometry final : public GeometryImpl
 {
 public:
@@ -101,7 +94,7 @@ public:
 
   using Sphere = bvh::Sphere<float>;
 
-  using ClosestIntersector = bvh::ClosestPrimitiveIntersector<Bvh, Sphere, true>;
+  using ClosestIntersector = bvh::ClosestPrimitiveIntersector<Bvh, Sphere, false>;
 
   using BvhRay = bvh::Ray<float>;
 
@@ -136,6 +129,12 @@ public:
   void SetCenter(int index, const BvhVec3& center) { m_spheres[index].origin = center; }
 
   void SetRadius(int index, float radius) { m_spheres[index].radius = radius; }
+
+  template<typename Index>
+  const Sphere& operator[](Index index) const noexcept
+  {
+    return m_spheres[index];
+  }
 
 private:
   std::vector<Sphere> m_spheres;
@@ -177,26 +176,35 @@ private:
 class Scene final
 {
 public:
+  using BvhVec3 = bvh::Vector<float, 3>;
+
   using BvhRay = bvh::Ray<float>;
 
   struct Hit final
   {
-    int geomIndex = -1;
-
     PrimitiveKind kind;
 
+    int geomIndex = -1;
+    int primIndex = -1;
+
     float distance = std::numeric_limits<float>::infinity();
+
     float u = 0;
     float v = 0;
 
+    BvhVec3 normal{ 0, 0, 0 };
+
     Hit() = default;
 
-    Hit(const SphereGeometry::Hit& hit, int index)
-      : geomIndex(index)
-      , kind(PrimitiveKind::Spheres)
+    Hit(const SphereGeometry::Hit& hit, const BvhRay& ray, const SphereGeometry& geom, int geomIndex_)
+      : kind(PrimitiveKind::Spheres)
+      , geomIndex(geomIndex_)
+      , primIndex(hit.primitive_index)
       , distance(hit.intersection.distance())
       , u(0)
       , v(0)
+      , normal(((ray.origin + (ray.direction * hit.intersection.distance())) - geom[hit.primitive_index].origin) *
+               (1.0f / geom[hit.primitive_index].radius))
     {}
 
     bool operator>(const SphereGeometry::Hit& sphereHit) const { return distance > sphereHit.intersection.distance(); }
@@ -228,9 +236,11 @@ public:
       const SphereGeometry* geom = m_sphereGeometries[i];
 
       const std::optional<SphereGeometry::Hit> sphereHit = geom->FindClosestHit(ray);
+      if (!sphereHit)
+        continue;
 
       if (sphereHit && (closestHit > sphereHit.value()))
-        closestHit = Hit(sphereHit.value(), i);
+        closestHit = Hit(sphereHit.value(), ray, *m_sphereGeometries[i], i);
     }
 
     return closestHit;
@@ -292,6 +302,14 @@ struct Viewport final
   int y = 0;
   int w = 1;
   int h = 1;
+};
+
+struct Perspective final
+{
+  float fovy = 1.0f;
+  float aspect = 1.0f;
+  float near = 0.0f;
+  float far = std::numeric_limits<float>::infinity();
 };
 
 class ContextImpl final : public Context
@@ -356,6 +374,7 @@ public:
   {
     const int w = xMax - xMin;
     const int h = yMax - yMin;
+
     const int area = w * h;
 
     //#pragma omp parallel for
@@ -389,42 +408,66 @@ public:
 
   void ClearScene() override { m_scene.reset(); }
 
+  void SetPerspective(float fovy, float aspect, float near, float far) override
+  {
+    m_perspective = Perspective{ fovy, aspect, near, far };
+  }
+
 private:
-  using BvhVec3 = bvh::Vector3<float>;
+  using BvhVec3 = bvh::Vector<float, 3>;
+
+  using BvhVec4 = bvh::Vector<float, 4>;
 
   using BvhRay = bvh::Ray<float>;
 
   template<typename Rng>
   BvhVec3 RenderPixel(int x, int y, Rng& rng) const
   {
+    const float fov = std::tan(m_perspective.fovy / 2.0f);
+
+    const float aspect = m_perspective.aspect;
+
     std::uniform_real_distribution<float> dist(0, 1);
 
     const float xNDC = ((((x - m_viewport.x) + dist(rng)) * 2.0f) / m_viewport.w) - 1.0f;
     const float yNDC = ((((y - m_viewport.y) + dist(rng)) * 2.0f) / m_viewport.h) - 1.0f;
 
-    const BvhVec3 rayDir(xNDC, yNDC, -1.0f);
+    const BvhVec3 rayDir = BvhVec3(xNDC * fov * aspect, yNDC * fov, -1.0f);
 
     const BvhVec3 rayOrg(0, 0, 5);
 
     const BvhRay ray(rayOrg, rayDir);
 
-    return Trace(ray, rng);
+    const int initDepth = 0;
+
+    return Trace(ray, rng, initDepth);
   }
 
   template<typename Rng>
-  BvhVec3 Trace(const BvhRay& ray, Rng&) const
+  BvhVec3 Trace(const BvhRay& ray, Rng& rng, int depth) const
   {
+    if (depth >= m_maxDepth)
+      return BvhVec3(0, 0, 0);
+
     const auto hit = m_scene->FindClosestHit(ray);
     if (!hit)
       return OnMiss(ray);
 
-    return BvhVec3(1, 0, 0);
+    const BvhVec3 hitPos = ray.origin + (ray.direction * hit.distance);
+
+    const BvhVec3 rayDir = SampleHemisphere(hit.normal, rng);
+
+    const BvhVec3 albedo(0.8, 0.8, 0.8);
+
+    const float shadowBias = 0.000001;
+
+    return albedo * Trace(BvhRay(hitPos, rayDir, shadowBias), rng, depth + 1);
   }
 
   BvhVec3 OnMiss(const BvhRay&) const
   {
     //
-    return BvhVec3(0, 0, 0);
+    return BvhVec3(1, 1, 1);
   }
 
   std::shared_ptr<Geometry> DrawTriangles(int first, int count, const float* attrib, int size)
@@ -460,6 +503,20 @@ private:
     return geom;
   }
 
+  template<typename Rng>
+  static BvhVec3 SampleHemisphere(const BvhVec3& normal, Rng& rng)
+  {
+    std::uniform_real_distribution<float> dist(-1, 1);
+
+    for (int i = 0; i < 32; i++) {
+      const BvhVec3 v(dist(rng), dist(rng), dist(rng));
+      if ((bvh::dot(v, normal) >= 0.0f) && (bvh::dot(v, v) <= 1.0f))
+        return bvh::normalize(v);
+    }
+
+    return normal;
+  }
+
   void Error(const char* msg)
   {
     for (DebugCallback* debugCallback : m_debugCallbacks)
@@ -485,9 +542,13 @@ private:
 
   Viewport m_viewport;
 
+  Perspective m_perspective;
+
   std::mt19937 m_globalRng{ 1234 };
 
   int m_pixelSeed = m_globalRng();
+
+  int m_maxDepth = 3;
 };
 
 } // namespace
