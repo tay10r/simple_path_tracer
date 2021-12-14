@@ -421,6 +421,8 @@ public:
     m_perspective = Perspective{ fovy, aspect, near, far };
   }
 
+  void SetSamplesPerPixel(int spp) override { m_samplesPerPixel = spp; }
+
 private:
   using BvhVec3 = bvh::Vector<float, 3>;
 
@@ -437,16 +439,23 @@ private:
 
     std::uniform_real_distribution<float> dist(0, 1);
 
-    const float xNDC = ((((x - m_viewport.x) + dist(rng)) * 2.0f) / m_viewport.w) - 1.0f;
-    const float yNDC = ((((y - m_viewport.y) + dist(rng)) * 2.0f) / m_viewport.h) - 1.0f;
+    BvhVec3 totalColor(0, 0, 0);
 
-    const BvhVec3 rayDir = BvhVec3(xNDC * fov * aspect, yNDC * fov, -1.0f);
+    for (int i = 0; i < m_samplesPerPixel; i++) {
 
-    const BvhRay ray(m_camera_position, rayDir);
+      const float xNDC = ((((x - m_viewport.x) + dist(rng)) * 2.0f) / m_viewport.w) - 1.0f;
+      const float yNDC = ((((y - m_viewport.y) + dist(rng)) * 2.0f) / m_viewport.h) - 1.0f;
 
-    const int initDepth = 0;
+      const BvhVec3 rayDir = BvhVec3(xNDC * fov * aspect, yNDC * fov, -1.0f);
 
-    return Trace(ray, rng, initDepth);
+      const BvhRay ray(m_camera_position, rayDir);
+
+      const int initDepth = 0;
+
+      totalColor = totalColor + Trace(ray, rng, initDepth);
+    }
+
+    return totalColor * (1.0f / m_samplesPerPixel);
   }
 
   template<typename Rng>
@@ -564,6 +573,8 @@ private:
   int m_pixelSeed = m_globalRng();
 
   int m_maxDepth = 3;
+
+  int m_samplesPerPixel = 16;
 };
 
 } // namespace

@@ -145,6 +145,11 @@ public:
   /// Sets the perspective transformation applies to camera rays.
   /// </summary>
   virtual void SetPerspective(float fovy, float aspect, float near, float far) = 0;
+
+  /// <summary>
+  /// Sets the number of samples to take per pixel. The default is 16.
+  /// </summary>
+  virtual void SetSamplesPerPixel(int spp) = 0;
 };
 
 } // namespace RT
