@@ -8,6 +8,7 @@
 #include <bvh/triangle.hpp>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 #include <limits>
 #include <optional>
@@ -377,7 +378,7 @@ public:
 
     const int area = w * h;
 
-    //#pragma omp parallel for
+#pragma omp parallel for
 
     for (int i = 0; i < area; i++) {
 
@@ -408,6 +409,15 @@ public:
 
   void ClearScene() override { m_scene.reset(); }
 
+  void SetCameraPosition(float x, float y, float z) override { m_camera_position = BvhVec3(x, y, z); }
+
+  void SetCameraRotation(float altitude, float azimuth) override
+  {
+    m_camera_altitude = altitude;
+
+    m_camera_azimuth = azimuth;
+  }
+
   void SetPerspective(float fovy, float aspect, float near, float far) override
   {
     m_perspective = Perspective{ fovy, aspect, near, far };
@@ -434,9 +444,7 @@ private:
 
     const BvhVec3 rayDir = BvhVec3(xNDC * fov * aspect, yNDC * fov, -1.0f);
 
-    const BvhVec3 rayOrg(0, 0, 5);
-
-    const BvhRay ray(rayOrg, rayDir);
+    const BvhRay ray(m_camera_position, rayDir);
 
     const int initDepth = 0;
 
@@ -464,10 +472,13 @@ private:
     return albedo * Trace(BvhRay(hitPos, rayDir, shadowBias), rng, depth + 1);
   }
 
-  BvhVec3 OnMiss(const BvhRay&) const
+  BvhVec3 OnMiss(const BvhRay& ray) const
   {
-    //
-    return BvhVec3(1, 1, 1);
+    const BvhVec3 up(0, 1, 0);
+    const BvhVec3 lo(1.0, 1.0, 1.0);
+    const BvhVec3 hi(0.5, 0.7, 1.0);
+    const float level = (bvh::dot(ray.direction, up) + 1.0f) * 0.5f;
+    return lo + ((hi - lo) * level);
   }
 
   std::shared_ptr<Geometry> DrawTriangles(int first, int count, const float* attrib, int size)
@@ -541,6 +552,12 @@ private:
   ContextState m_state;
 
   Viewport m_viewport;
+
+  BvhVec3 m_camera_position = BvhVec3(0, 0, 0);
+
+  float m_camera_altitude = 0;
+
+  float m_camera_azimuth = 0;
 
   Perspective m_perspective;
 

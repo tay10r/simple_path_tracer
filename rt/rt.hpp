@@ -132,6 +132,16 @@ public:
   virtual void ClearScene() = 0;
 
   /// <summary>
+  /// Sets the camera position in world space.
+  /// </summary>
+  virtual void SetCameraPosition(float x, float y, float z) = 0;
+
+  /// <summary>
+  /// Sets the camera rotation in radians.
+  /// </summary>
+  virtual void SetCameraRotation(float altitude, float azimuth) = 0;
+
+  /// <summary>
   /// Sets the perspective transformation applies to camera rays.
   /// </summary>
   virtual void SetPerspective(float fovy, float aspect, float near, float far) = 0;

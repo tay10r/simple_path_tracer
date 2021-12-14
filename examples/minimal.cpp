@@ -39,6 +39,8 @@ public:
 
     m_context->SetViewport(0, 0, frameSize.x, frameSize.y);
 
+    m_context->SetCameraPosition(0, 0, 5);
+
     m_context->Render(min.x, min.y, max.x, max.y, rgb);
 
     m_context->ClearScene();
