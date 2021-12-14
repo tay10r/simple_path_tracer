@@ -217,8 +217,6 @@ public:
   {
     m_attachedGeometries.emplace_back(geometry);
 
-    assert(m_attachedGeometries.size() == 1);
-
     ResolveDerived(static_cast<const GeometryImpl*>(geometry.get()));
   }
 
